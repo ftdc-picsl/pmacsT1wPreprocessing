@@ -9,12 +9,19 @@ repoDir=${scriptDir%/bin}
 
 function usage() {
   echo "Usage:
-  $0 [-h] -i input_dataset -o output_dataset <participant_list>
+  $0 [-h] -i input_dataset -o output_dataset <input_list> [level=participant]
 
-  This is a wrapper script to submit images for processing. The participant list should be
-  a text file containing one participant ID per line, without the 'sub-' prefix.
+  This is a wrapper script to submit images for processing. The input list should either be:
 
-  Images will be processed from all participants in input dataset. Only images with the suffix
+    participants (default) -  a text file containing one participant ID per line, without the 'sub-' prefix.
+    sessions - a CSV file containing one participant and session per file, without the 'sub-' and 'ses-' prefixes.
+
+    Example:
+
+      $0 -i /path/to/input/dataset -o /path/to/output/dataset /path/to/participant_list.txt participant
+      $0 -i /path/to/input/dataset -o /path/to/output/dataset /path/to/session_list.txt session
+
+  Images will be processed from all participants / sessions in input list. Only images with the suffix
   '_T1w.nii.gz' will be processed. Images that already have masks in the output dataset will not
   be reprocessed.
 
@@ -46,7 +53,12 @@ done
 
 shift $((OPTIND-1))
 
-participantList=$1
+inputList=$1
+level=$2
+
+if [[ -z $level ]]; then
+  level="participant"
+fi
 
 export SINGULARITYENV_TMPDIR=/tmp
 
@@ -56,11 +68,11 @@ if [[ ! -d "${outputBIDS}/code/logs" ]]; then
   mkdir -p "${outputBIDS}/code/logs"
 fi
 
-bsub -cwd . -o "${outputBIDS}/code/logs/ftdc-t1w-preproc_${date}_%J.txt"\
+echo bsub -cwd . -o "${outputBIDS}/code/logs/ftdc-t1w-preproc_${date}_%J.txt"\
     -gpu "num=1:mode=exclusive_process:mps=no" \
     singularity run --containall --nv \
-    -B /scratch:/tmp,${inputBIDS}:/input,${outputBIDS}:/output,${participantList}:/participants/list.txt \
+    -B /scratch:/tmp,${inputBIDS}:/input,${outputBIDS}:/output,${inputList}:/input/list.txt \
     ${repoDir}/containers/ftdc-t1w-preproc-0.2.1.sif \
     --input-dataset /input \
     --output-dataset /output \
-    --participant /participants/list.txt
+    --${level}-list /input/list.txt
