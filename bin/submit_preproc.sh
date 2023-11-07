@@ -68,7 +68,7 @@ if [[ ! -d "${outputBIDS}/code/logs" ]]; then
   mkdir -p "${outputBIDS}/code/logs"
 fi
 
-echo bsub -cwd . -o "${outputBIDS}/code/logs/ftdc-t1w-preproc_${date}_%J.txt"\
+bsub -cwd . -o "${outputBIDS}/code/logs/ftdc-t1w-preproc_${date}_%J.txt"\
     -gpu "num=1:mode=exclusive_process:mps=no" \
     singularity run --containall --nv \
     -B /scratch:/tmp,${inputBIDS}:/input,${outputBIDS}:/output,${inputList}:/input/list.txt \
