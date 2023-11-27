@@ -25,8 +25,7 @@ function usage() {
   '_T1w.nii.gz' will be processed. Images that already have masks in the output dataset will not
   be reprocessed.
 
-  If the output dataset directory does not exist, it will be created, however the user must create
-  dataset_description.json for the dataset to be valid BIDS.
+  If the output dataset directory does not exist, it will be created.
 
   Logs will be written to 'code/logs' in the output dataset.
 
@@ -72,7 +71,7 @@ bsub -cwd . -o "${outputBIDS}/code/logs/ftdc-t1w-preproc_${date}_%J.txt"\
     -gpu "num=1:mode=exclusive_process:mps=no" \
     singularity run --containall --nv \
     -B /scratch:/tmp,${inputBIDS}:/input,${outputBIDS}:/output,${inputList}:/input/list.txt \
-    ${repoDir}/containers/ftdc-t1w-preproc-0.2.2.sif \
+    ${repoDir}/containers/ftdc-t1w-preproc-0.3.1.sif \
     --input-dataset /input \
     --output-dataset /output \
     --${level}-list /input/list.txt
