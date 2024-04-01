@@ -9,11 +9,11 @@ repoDir=${scriptDir%/bin}
 
 function usage() {
   echo "Usage:
-  $0 [-h] -i input_dataset -o output_dataset <input_list> [level=participant]
+  $0 [-h] -i input_dataset -o output_dataset <input_list> <level=participant|session> [additional args to T1wPreprocessing]
 
   This is a wrapper script to submit images for processing. The input list should either be:
 
-    participants (default) -  a text file containing one participant ID per line, without the 'sub-' prefix.
+    participants - a text file containing one participant ID per line, without the 'sub-' prefix.
     sessions - a CSV file containing one participant and session per file, without the 'sub-' and 'ses-' prefixes.
 
     Example:
@@ -55,9 +55,12 @@ shift $((OPTIND-1))
 inputList=$1
 level=$2
 
-if [[ -z $level ]]; then
-  level="participant"
+if [[ $level != "participant" && $level != "session" ]]; then
+  echo "Error: level must be 'participant' or 'session'"
+  exit 1
 fi
+
+shift 2
 
 export SINGULARITYENV_TMPDIR=/tmp
 
@@ -71,7 +74,8 @@ bsub -cwd . -o "${outputBIDS}/code/logs/ftdc-t1w-preproc_${date}_%J.txt"\
     -gpu "num=1:mode=exclusive_process:mps=no" \
     singularity run --containall --nv \
     -B /scratch:/tmp,${inputBIDS}:/input:ro,${outputBIDS}:/output,${inputList}:/input/list.txt \
-    ${repoDir}/containers/ftdc-t1w-preproc-0.3.4.sif \
+    ${repoDir}/containers/ftdc-t1w-preproc-0.4.0.sif \
     --input-dataset /input \
     --output-dataset /output \
-    --${level}-list /input/list.txt
+    --${level}-list /input/list.txt \
+    "$@"
