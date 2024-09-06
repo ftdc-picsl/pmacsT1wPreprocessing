@@ -74,7 +74,7 @@ bsub -cwd . -o "${outputBIDS}/code/logs/ftdc-t1w-preproc_${date}_%J.txt"\
     -gpu "num=1:mode=exclusive_process:mps=no:gtile=1" \
     singularity run --containall --nv \
     -B /scratch:/tmp,${inputBIDS}:/input:ro,${outputBIDS}:/output,${inputList}:/input/list.txt \
-    ${repoDir}/containers/ftdc-t1w-preproc-0.4.0.sif \
+    ${repoDir}/containers/ftdc-t1w-preproc-0.4.1.sif \
     --input-dataset /input \
     --output-dataset /output \
     --${level}-list /input/list.txt \
