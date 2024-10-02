@@ -7,9 +7,11 @@ scriptDir=$(dirname "${scriptPath}")
 # Repo base dir under which we find bin/ and containers/
 repoDir=${scriptDir%/bin}
 
+queue=ftdc_normal
+
 function usage() {
   echo "Usage:
-  $0 [-h] -i input_dataset -o output_dataset <input_list> <level=participant|session> [additional args to T1wPreprocessing]
+  $0 [-h] -i input_dataset  -o output_dataset  <input_list>  <level=participant|session>  [additional args to T1wPreprocessing]
 
   This is a wrapper script to submit images for processing. The input list should either be:
 
@@ -32,6 +34,9 @@ function usage() {
   Required arguments:
     -i input_dataset    : path to the input dataset
     -o output_dataset   : path to the output dataset
+
+  Optional arguments:
+    -q                  : queue name (default=$queue). The queue must be able to support GPU jobs.
   "
 }
 
@@ -45,6 +50,7 @@ while getopts "i:o:p:h" opt; do
     h) usage; exit 1;;
     i) inputBIDS=$OPTARG;;
     o) outputBIDS=$OPTARG;;
+    q) queue=$OPTARG;;
     \?) echo "Unknown option $OPTARG"; exit 2;;
     :) echo "Option $OPTARG requires an argument"; exit 2;;
   esac
@@ -70,11 +76,12 @@ if [[ ! -d "${outputBIDS}/code/logs" ]]; then
   mkdir -p "${outputBIDS}/code/logs"
 fi
 
-bsub -cwd . -o "${outputBIDS}/code/logs/ftdc-t1w-preproc_${date}_%J.txt"\
+bsub -cwd . -o "${outputBIDS}/code/logs/ftdc-t1w-preproc_${date}_%J.txt" \
+    -q ${queue} \
     -gpu "num=1:mode=exclusive_process:mps=no:gtile=1" \
     singularity run --containall --nv \
     -B /scratch:/tmp,${inputBIDS}:/input:ro,${outputBIDS}:/output,${inputList}:/input/list.txt \
-    ${repoDir}/containers/ftdc-t1w-preproc-0.4.0.sif \
+    ${repoDir}/containers/ftdc-t1w-preproc-0.4.1.sif \
     --input-dataset /input \
     --output-dataset /output \
     --${level}-list /input/list.txt \
