@@ -45,7 +45,7 @@ if [[ $# -eq 0 ]]; then
   exit 1
 fi
 
-while getopts "i:o:p:h" opt; do
+while getopts "i:o:q:h" opt; do
   case $opt in
     h) usage; exit 1;;
     i) inputBIDS=$OPTARG;;
