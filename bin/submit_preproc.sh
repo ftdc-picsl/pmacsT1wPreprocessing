@@ -70,6 +70,9 @@ shift 2
 
 export SINGULARITYENV_TMPDIR=/tmp
 
+# Hard-coded for the ftdc-gpu01 cluster
+export SINGULARITYENV_CUDA_VISIBLE_DEVICES=0
+
 date=`date +%Y%m%d_%H%M%S`
 
 if [[ ! -d "${outputBIDS}/code/logs" ]]; then
