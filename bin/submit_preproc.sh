@@ -1,6 +1,6 @@
 #!/bin/bash
 
-module load singularity/3.8.3
+module load apptainer
 
 scriptPath=$(readlink -f "$0")
 scriptDir=$(dirname "${scriptPath}")
@@ -8,6 +8,8 @@ scriptDir=$(dirname "${scriptPath}")
 repoDir=${scriptDir%/bin}
 
 queue=ftdc_normal
+
+numThreads=4
 
 function usage() {
   echo "Usage:
@@ -36,6 +38,7 @@ function usage() {
     -o output_dataset   : path to the output dataset
 
   Optional arguments:
+    -n num_threads      : number of CPU cores to request for the job (default=$numThreads).
     -q                  : queue name (default=$queue). The queue must be able to support GPU jobs.
   "
 }
@@ -45,10 +48,11 @@ if [[ $# -eq 0 ]]; then
   exit 1
 fi
 
-while getopts "i:o:q:h" opt; do
+while getopts "i:n:o:q:h" opt; do
   case $opt in
     h) usage; exit 1;;
     i) inputBIDS=$OPTARG;;
+    n) numThreads=$OPTARG;;
     o) outputBIDS=$OPTARG;;
     q) queue=$OPTARG;;
     \?) echo "Unknown option $OPTARG"; exit 2;;
@@ -68,10 +72,12 @@ fi
 
 shift 2
 
-export SINGULARITYENV_TMPDIR=/tmp
+export APPTAINERENV_TMPDIR=/tmp
 
 # Hard-coded for the ftdc-gpu01 cluster
-export SINGULARITYENV_CUDA_VISIBLE_DEVICES=0
+export APPTAINERENV_CUDA_VISIBLE_DEVICES=0
+export APPTAINERENV_ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS=${numThreads}
+export APPTAINERENV_OMP_NUM_THREADS=${numThreads}
 
 date=`date +%Y%m%d_%H%M%S`
 
@@ -80,12 +86,14 @@ if [[ ! -d "${outputBIDS}/code/logs" ]]; then
 fi
 
 bsub -cwd . -o "${outputBIDS}/code/logs/ftdc-t1w-preproc_${date}_%J.txt" \
+    -J t1w_preproc_gpu \
     -q ${queue} \
+    -n ${numThreads} \
     -gpu "num=1:mode=exclusive_process:mps=no:gtile=1" \
-    singularity run --containall --nv \
-    -B /scratch:/tmp,${inputBIDS}:/input:ro,${outputBIDS}:/output,${inputList}:/input/list.txt \
-    ${repoDir}/containers/ftdc-t1w-preproc-0.5.0.sif \
-    --input-dataset /input \
-    --output-dataset /output \
+    apptainer run --containall --nv \
+    -B /scratch:/tmp,${inputBIDS}:${inputBIDS}:ro,${outputBIDS}:${outputBIDS},${inputList}:/input/list.txt \
+    ${repoDir}/containers/ftdc-t1w-preproc-0.5.2.sif \
+    --input-dataset ${inputBIDS} \
+    --output-dataset ${outputBIDS} \
     --${level}-list /input/list.txt \
     "$@"
