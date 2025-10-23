@@ -92,7 +92,7 @@ bsub -cwd . -o "${outputBIDS}/code/logs/ftdc-t1w-preproc_${date}_%J.txt" \
     -gpu "num=1:mode=exclusive_process:mps=no:gtile=1" \
     apptainer run --containall --nv \
     -B /scratch:/tmp,${inputBIDS}:${inputBIDS}:ro,${outputBIDS}:${outputBIDS},${inputList}:/input/list.txt \
-    ${repoDir}/containers/ftdc-t1w-preproc-0.5.2.sif \
+    ${repoDir}/containers/ftdc-t1w-preproc-0.5.3.sif \
     --input-dataset ${inputBIDS} \
     --output-dataset ${outputBIDS} \
     --${level}-list /input/list.txt \
