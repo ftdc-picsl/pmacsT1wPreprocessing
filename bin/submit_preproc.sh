@@ -44,7 +44,7 @@ function usage() {
     -n num_threads      : number of CPU cores to request for the job (default=$numThreads).
     -q queue_name       : queue name (default=$queue). The queue must be able to support GPU jobs.
     -r 0/1              : reset the origin of T1w images to the centroid of the mask (default=${resetOrigin}).
-    -t 0/1              : Trim the neck from the T1w images before processing (default=${trimNeck}).
+    -t 0/1              : trim the neck from the T1w images before processing (default=${trimNeck}).
   "
 }
 
