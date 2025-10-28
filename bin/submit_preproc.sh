@@ -36,6 +36,11 @@ function usage() {
 
   Logs will be written to 'code/logs' in the output dataset.
 
+  The processing workflow is optimized for efficiency, but it will not recover efficiently from failed jobs.
+  It also requires enough scratch space to hold all the intermediate T1w images and masks. Therefore, it is
+  recommended to run in batches of several hundred images.
+
+
   Required arguments:
     -i input_dataset    : path to the input dataset
     -o output_dataset   : path to the output dataset
@@ -45,6 +50,7 @@ function usage() {
     -q queue_name       : queue name (default=$queue). The queue must be able to support GPU jobs.
     -r 0/1              : reset the origin of T1w images to the centroid of the mask (default=${resetOrigin}).
     -t 0/1              : trim the neck from the T1w images before processing (default=${trimNeck}).
+
   "
 }
 
