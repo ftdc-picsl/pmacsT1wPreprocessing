@@ -94,15 +94,18 @@ fi
 
 # Have to bsub into a node to get a temp dir because /scratch is not visible from the head node
 local_tmpdir_file=$(mktemp ${outputBIDS}/code/logs/t1w_preproc_local_tmpdir_XXXXXXXX.txt)
+
 jid0=$(bsub -cwd . -J t1w_preproc_mk_scratch -o wtf.out \
   ${repoDir}/bin/get_tmpdir.sh ${local_tmpdir_file} | sed -n 's/Job <\([0-9]\+\)>.*/\1/p')
 
+echo "Requested working dir on compute node, waiting for result"
+
 bwait -w "done($jid0)"
 local_tmpdir=$(cat ${local_tmpdir_file}) || { echo "no path"; exit 1; }
-echo "Local tmpdir for preprocessing: $local_tmpdir"
+echo "Local working dir for preprocessing: $local_tmpdir"
 rm -f ${local_tmpdir_file}
 
-container=${repoDir}/containers/ftdc-t1w-preproc-unstable.sif
+container=${repoDir}/containers/ftdc-t1w-preproc-0.6.0.sif
 
 # prepare input does not need GPU
 jid1=$(bsub \
