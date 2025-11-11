@@ -101,7 +101,7 @@ fi
 # Have to bsub into a node to get a temp dir because /scratch is not visible from the head node
 local_tmpdir_file=$(mktemp ${outputBIDS}/code/logs/t1w_preproc_local_tmpdir_XXXXXXXX.txt)
 
-jid0=$(bsub -cwd . -J t1w_preproc_mk_scratch -o wtf.out \
+jid0=$(bsub -cwd . -q ${queue} -J t1w_preproc_mk_scratch -o wtf.out \
   ${repoDir}/bin/get_tmpdir.sh ${local_tmpdir_file} | sed -n 's/Job <\([0-9]\+\)>.*/\1/p')
 
 echo "Requested working dir on compute node, waiting for result"
