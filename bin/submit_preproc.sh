@@ -101,7 +101,7 @@ fi
 # Have to bsub into a node to get a temp dir because /scratch is not visible from the head node
 local_tmpdir_file=$(mktemp ${outputBIDS}/code/logs/t1w_preproc_local_tmpdir_XXXXXXXX.txt)
 
-jid0=$(bsub -cwd . -q ${queue} -J t1w_preproc_mk_scratch -o wtf.out \
+jid0=$(bsub -cwd . -q ${queue} -J t1w_preproc_mk_scratch -o ${outputBIDS}/code/logs/ftdc-t1w-preproc_mk_scratch_${date}_%J.txt \
   ${repoDir}/bin/get_tmpdir.sh ${local_tmpdir_file} | sed -n 's/Job <\([0-9]\+\)>.*/\1/p')
 
 echo "Requested working dir on compute node, waiting for result"
@@ -111,7 +111,7 @@ local_tmpdir=$(cat ${local_tmpdir_file}) || { echo "no path"; exit 1; }
 echo "Local working dir for preprocessing: $local_tmpdir"
 rm -f ${local_tmpdir_file}
 
-container=${repoDir}/containers/ftdc-t1w-preproc-0.6.0.sif
+container=${repoDir}/containers/ftdc-t1w-preproc-0.6.1.sif
 
 # prepare input does not need GPU
 jid1=$(bsub \
@@ -120,11 +120,13 @@ jid1=$(bsub \
     -q ${queue} \
     -n ${numThreads} \
     apptainer run --containall \
-      -B /scratch:/tmp,${local_tmpdir}:/workdir,${inputBIDS}:${inputBIDS}:ro,${outputBIDS}:${outputBIDS},${inputList}:/input/list.txt \
+      -B /scratch:/tmp,${local_tmpdir}:/workdir,${inputBIDS}:${inputBIDS}:ro,${outputBIDS}:${outputBIDS}:ro,${inputList}:/input/list.txt \
       ${container} \
         prepare_input \
         --input-dataset ${inputBIDS} \
         --output-directory /workdir \
+        --pipeline-output-dataset ${outputBIDS} \
+        --verbose \
         --${level}-list /input/list.txt | sed -n 's/Job <\([0-9]\+\)>.*/\1/p')
 
 echo "Submitted prepare_input job with Job ID $jid1"
@@ -145,7 +147,7 @@ jid2=$(bsub -cwd . \
 
 echo "Submitted run_hdbet job with Job ID $jid2"
 sleep 0.1
-#postprocessing does not need GPU
+# postprocessing does not need GPU
 postProcFlags=""
 if [[ ${resetOrigin} -eq 1 ]]; then
   postProcFlags="${postProcFlags} --reset-origin"
