@@ -85,6 +85,18 @@ fi
 
 shift 2
 
+if [[ ! -f "$inputList" ]]; then
+  echo "Error: input file not found: $inputList"
+  exit 1
+fi
+
+jobArrayLength=$( wc -l $inputList )
+
+if [[ "$jobArrayLength" -gt 1000 ]]; then
+  echo "Error: maximum job array length is 1000. Input file has ${jobArrayLength} lines"
+  exit 1
+fi
+
 export APPTAINERENV_TMPDIR=/tmp
 
 # Hard-coded for the ftdc-gpu01 cluster
@@ -111,7 +123,7 @@ local_tmpdir=$(cat ${local_tmpdir_file}) || { echo "no path"; exit 1; }
 echo "Local working dir for preprocessing: $local_tmpdir"
 rm -f ${local_tmpdir_file}
 
-container=${repoDir}/containers/ftdc-t1w-preproc-0.6.1.sif
+container=${repoDir}/containers/ftdc-t1w-preproc-0.6.2.sif
 
 # prepare input does not need GPU
 jid1=$(bsub \
@@ -136,6 +148,7 @@ jid2=$(bsub -cwd . \
     -J t1w_preproc_hdbet_gpu \
     -o "${outputBIDS}/code/logs/ftdc-t1w-preproc_hdbet_${date}_%J.txt" \
     -w "done($jid1)" \
+    -ti \
     -q ${queue} \
     -n ${numThreads} \
     -gpu "num=1:mode=exclusive_process:mps=no:gtile=1" \
@@ -162,6 +175,7 @@ jid3=$(bsub -cwd . \
     -J t1w_preproc_postproc \
     -o ${outputBIDS}/code/logs/ftdc-t1w-preproc_postproc_${date}_%J.txt \
     -w "done($jid2)" \
+    -ti \
     -q ${queue} \
     -n ${numThreads} \
     apptainer run --containall \
