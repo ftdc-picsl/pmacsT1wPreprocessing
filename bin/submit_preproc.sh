@@ -14,9 +14,13 @@ numThreads=4
 resetOrigin=0
 trimNeck=1
 
+bidsFilter=""
+preferenceList=""
+
+
 function usage() {
   echo "Usage:
-  $0 [-h] -i input_dataset  -o output_dataset  <input_list> [options] <level=participant|session>
+  $0 [-h] -i input_dataset -o output_dataset [options] <input_list> <level=participant|session>
 
   This is a wrapper script to submit images for processing. The input list should either be:
 
@@ -32,9 +36,32 @@ function usage() {
   '_T1w.nii.gz' will be processed. Images that already have masks in the output dataset will not
   be reprocessed.
 
+
+  BIDS Filtering:
+
+  If a BIDS filter is provided, it will be applied to each session. The filter should be a JSON file with a "t1w" query
+  that extends the default query:
+
+  {
+    "t1w": {
+      "datatype": "anat",
+      "suffix": "T1w",
+    }
+  }
+
+
+  Ranked acquisition preference:
+
+  There is often a need to select a single T1w image for processing in heterogenous datasets. Use the '-p' option to pass a
+  comma-separated list, or the path to a text file with a ranked list of acquisition labels (without the 'acq-' prefix). If this
+  option is used, ONLY acquisitions on the list will be considered for processing. The ranked preference list is applied after
+  BIDS filtering.
+
+
   If the output dataset directory does not exist, it will be created.
 
   Logs will be written to 'code/logs' in the output dataset.
+
 
   The processing workflow is optimized for efficiency, but it will not recover efficiently from failed jobs.
   It also requires enough scratch space to hold all the intermediate T1w images and masks. Therefore, it is
@@ -46,9 +73,10 @@ function usage() {
     -o output_dataset   : path to the output dataset
 
   Optional arguments:
+    -b bids_filter      : a JSON file to use as a BIDS filter. Only the "t1w" query is used.
     -n num_threads      : number of CPU cores to request for the job (default=$numThreads).
-    -q queue_name       : queue name (default=$queue). The queue must be able to support GPU jobs.
-    -r 0/1              : reset the origin of T1w images to the centroid of the mask (default=${resetOrigin}).
+    -p preference_list  : A comma-separated list or a text file with a ranked list of acquisition labels
+                          (without the 'acq-' prefix) to select the first available acquisition in order of preference.
     -t 0/1              : trim the neck from the T1w images before processing (default=${trimNeck}).
 
   "
@@ -59,12 +87,14 @@ if [[ $# -eq 0 ]]; then
   exit 1
 fi
 
-while getopts "i:n:o:q:r:t:h" opt; do
+while getopts "b:i:n:o:p:q:r:t:h" opt; do
   case $opt in
+    b) bidsFilter=$OPTARG;;
     h) usage; exit 1;;
     i) inputBIDS=$OPTARG;;
     n) numThreads=$OPTARG;;
     o) outputBIDS=$OPTARG;;
+    p) preferenceList=$OPTARG;;
     q) queue=$OPTARG;;
     r) resetOrigin=$OPTARG;;
     t) trimNeck=$OPTARG;;
@@ -90,11 +120,21 @@ if [[ ! -f "$inputList" ]]; then
   exit 1
 fi
 
-jobArrayLength=$( wc -l $inputList )
+jobArrayLength=$( cat "$inputList" | wc -l )
 
 if [[ "$jobArrayLength" -gt 1000 ]]; then
   echo "Error: maximum job array length is 1000. Input file has ${jobArrayLength} lines"
   exit 1
+fi
+
+filterFlags=""
+
+if [[ -n "$bidsFilter" ]]; then
+  filterFlags="${filterFlags} --bids-filter '${bidsFilter}'"
+fi
+
+if [[ -n "$preferenceList" ]]; then
+  filterFlags="${filterFlags} --preference-list ${preferenceList}"
 fi
 
 export APPTAINERENV_TMPDIR=/tmp
@@ -123,7 +163,7 @@ local_tmpdir=$(cat ${local_tmpdir_file}) || { echo "no path"; exit 1; }
 echo "Local working dir for preprocessing: $local_tmpdir"
 rm -f ${local_tmpdir_file}
 
-container=${repoDir}/containers/ftdc-t1w-preproc-0.6.2.sif
+container=${repoDir}/containers/ftdc-t1w-preproc-unstable.sif
 
 # prepare input does not need GPU
 jid1=$(bsub \
@@ -139,7 +179,8 @@ jid1=$(bsub \
         --output-directory /workdir \
         --pipeline-output-dataset ${outputBIDS} \
         --verbose \
-        --${level}-list /input/list.txt | sed -n 's/Job <\([0-9]\+\)>.*/\1/p')
+        --${level}-list /input/list.txt \
+        ${filterFlags} | sed -n 's/Job <\([0-9]\+\)>.*/\1/p')
 
 echo "Submitted prepare_input job with Job ID $jid1"
 sleep 0.1
@@ -185,7 +226,6 @@ jid3=$(bsub -cwd . \
         --input-dataset ${inputBIDS} \
         --hd-bet-input-dir /workdir \
         --output-dataset ${outputBIDS} \
-        --${level}-list /input/list.txt \
         ${postProcFlags} | sed -n 's/Job <\([0-9]\+\)>.*/\1/p')
 
 echo "Submitted run_postprocessing job with Job ID $jid3"
