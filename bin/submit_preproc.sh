@@ -2,7 +2,7 @@
 
 module load apptainer/1.4.1
 
-scriptPath=$(readlink -f "$0")
+scriptPath=$(realpath "$0")
 scriptDir=$(dirname "${scriptPath}")
 # Repo base dir under which we find bin/ and containers/
 repoDir=${scriptDir%/bin}
@@ -17,6 +17,8 @@ trimNeck=1
 bidsFilter=""
 preferenceList=""
 
+# Set to 1 to only process the last run for a given acquisition
+lastRunOnly=0
 
 function usage() {
   echo "Usage:
@@ -49,7 +51,6 @@ function usage() {
     }
   }
 
-
   Ranked acquisition preference:
 
   There is often a need to select a single T1w image for processing in heterogenous datasets. Use the '-p' option to pass a
@@ -74,9 +75,11 @@ function usage() {
 
   Optional arguments:
     -b bids_filter      : a JSON file to use as a BIDS filter. Only the "t1w" query is used.
+    -l 0/1              : Only process the last run for each acquisition (default=${lastRunOnly}).
     -n num_threads      : number of CPU cores to request for the job (default=$numThreads).
     -p preference_list  : A comma-separated list or a text file with a ranked list of acquisition labels
                           (without the 'acq-' prefix) to select the first available acquisition in order of preference.
+    -r 0/1              : Reset the origin of the T1w image to the center of mass of the brain mask (default=${resetOrigin}).
     -t 0/1              : trim the neck from the T1w images before processing (default=${trimNeck}).
 
   "
@@ -87,11 +90,12 @@ if [[ $# -eq 0 ]]; then
   exit 1
 fi
 
-while getopts "b:i:n:o:p:q:r:t:h" opt; do
+while getopts "b:i:l:n:o:p:q:r:t:h" opt; do
   case $opt in
     b) bidsFilter=$OPTARG;;
     h) usage; exit 1;;
     i) inputBIDS=$OPTARG;;
+    l) lastRunOnly=$OPTARG;;
     n) numThreads=$OPTARG;;
     o) outputBIDS=$OPTARG;;
     p) preferenceList=$OPTARG;;
@@ -127,14 +131,30 @@ if [[ "$jobArrayLength" -gt 1000 ]]; then
   exit 1
 fi
 
+prepMountPoints=(
+    "${inputBIDS}:${inputBIDS}:ro"
+    "${outputBIDS}:${outputBIDS}:ro"
+    "${inputList}:/input/list.txt"
+)
+
 filterFlags=""
 
 if [[ -n "$bidsFilter" ]]; then
-  filterFlags="${filterFlags} --bids-filter '${bidsFilter}'"
+  filterFlags="${filterFlags} --bids-filter /input/bidsFilter.json"
+  prepMountPoints+=("${bidsFilter}:/input/bidsFilter.json:ro")
 fi
 
 if [[ -n "$preferenceList" ]]; then
-  filterFlags="${filterFlags} --preference-list ${preferenceList}"
+  if [[ -f "$preferenceList" ]]; then
+    filterFlags="${filterFlags} --acq-preference-ranks /input/preference_list.txt"
+    prepMountPoints+=("${preferenceList}:/input/preference_list.txt:ro")
+  else
+    filterFlags="${filterFlags} --acq-preference-ranks ${preferenceList}"
+  fi
+fi
+
+if [[ ${lastRunOnly} -eq 1 ]]; then
+  filterFlags="${filterFlags} --last-run-only"
 fi
 
 export APPTAINERENV_TMPDIR=/tmp
@@ -165,6 +185,13 @@ rm -f ${local_tmpdir_file}
 
 container=${repoDir}/containers/ftdc-t1w-preproc-unstable.sif
 
+ prepMountPoints+=(
+    "/scratch:/tmp"
+    "${local_tmpdir}:/workdir"
+ )
+
+prepMountStr=$(IFS=,; echo "${prepMountPoints[*]}")
+
 # prepare input does not need GPU
 jid1=$(bsub \
     -J t1w_preproc_prep \
@@ -172,7 +199,7 @@ jid1=$(bsub \
     -q ${queue} \
     -n ${numThreads} \
     apptainer run --containall \
-      -B /scratch:/tmp,${local_tmpdir}:/workdir,${inputBIDS}:${inputBIDS}:ro,${outputBIDS}:${outputBIDS}:ro,${inputList}:/input/list.txt \
+      -B ${prepMountStr} \
       ${container} \
         prepare_input \
         --input-dataset ${inputBIDS} \
@@ -220,7 +247,7 @@ jid3=$(bsub -cwd . \
     -q ${queue} \
     -n ${numThreads} \
     apptainer run --containall \
-      -B /scratch:/tmp,${local_tmpdir}:/workdir,${inputBIDS}:${inputBIDS}:ro,${outputBIDS}:${outputBIDS},${inputList}:/input/list.txt \
+      -B /scratch:/tmp,${local_tmpdir}:/workdir,${inputBIDS}:${inputBIDS}:ro,${outputBIDS}:${outputBIDS} \
       ${container} \
         postprocessing \
         --input-dataset ${inputBIDS} \
