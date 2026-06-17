@@ -7,6 +7,8 @@ scriptDir=$(dirname "${scriptPath}")
 # Repo base dir under which we find bin/ and containers/
 repoDir=${scriptDir%/bin}
 
+container=${repoDir}/containers/ftdc-t1w-preproc-0.7.0.sif
+
 queue=ftdc_normal
 
 numThreads=4
@@ -182,8 +184,6 @@ bwait -w "done($jid0)"
 local_tmpdir=$(cat ${local_tmpdir_file}) || { echo "no path"; exit 1; }
 echo "Local working dir for preprocessing: $local_tmpdir"
 rm -f ${local_tmpdir_file}
-
-container=${repoDir}/containers/ftdc-t1w-preproc-unstable.sif
 
  prepMountPoints+=(
     "/scratch:/tmp"
